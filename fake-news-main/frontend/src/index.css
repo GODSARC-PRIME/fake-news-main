@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* All custom keyframes and design tokens live in App.css */
+/* This file is the Tailwind entry point only */
+
+body {
+  background: #050810;
+  min-height: 100vh;
+}
