@@ -1,7 +1,9 @@
 FROM python:3.12.9-slim
 
-# Install system dependencies for ffmpeg/audio/video processing
+# Install system dependencies for ffmpeg/audio/video processing and build tools
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
     ffmpeg \
     libavformat-dev \
     libavcodec-dev \
