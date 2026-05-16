@@ -1,1 +1,15 @@
--r fake-news-main/backend/requirements.txt
+Django==4.2.11
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+dj-database-url==2.1.0
+python-dotenv==1.0.0
+Celery==5.3.4
+redis==5.0.1
+requests==2.31.0
+langdetect==1.0.9
+whitenoise==6.6.0
+gunicorn==21.2.0
+Pillow==10.1.0
+faster-whisper==0.10.0
+openai-whisper==20230314
+psycopg2-binary==2.9.9
