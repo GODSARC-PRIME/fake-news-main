@@ -10,7 +10,7 @@ urlpatterns = [
     path("result/<uuid:submission_id>/", views.get_result, name="result"),
     path("recent/", views.get_recent, name="recent"),
     
-# Auth endpoints
+    # Auth endpoints
     path("auth/login/", auth_views.login_view, name="login"),
     path("auth/logout/", auth_views.logout_view, name="logout"),
     path("auth/profile/", auth_views.profile_view, name="profile"),
@@ -25,7 +25,4 @@ urlpatterns = [
     path("admin/suspicious-words/", admin_views.get_suspicious_words_stats, name="admin_suspicious_words"),
     path("admin/system-usage/", admin_views.get_system_usage_report, name="admin_system_usage"),
     path("admin/submissions/<uuid:submission_id>/delete/", admin_views.delete_submission, name="admin_delete_submission"),
-    
-    # Temporary admin bootstrap (remove after first admin is created)
-    path("bootstrap-admin/", admin_views.bootstrap_admin, name="bootstrap_admin"),
 ]
