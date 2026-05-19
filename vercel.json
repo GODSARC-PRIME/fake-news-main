@@ -1,8 +1,0 @@
-{
-  "projects": [
-    {
-      "name": "fake-news-main",
-      "rootDirectory": "fake-news-main/frontend"
-    }
-  ]
-}

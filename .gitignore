@@ -95,3 +95,6 @@ celerybeat.pid
 
 # ── Uploads / user data ───────────────────────────────────────────
 media/uploads/
+
+.vercel
+.env*.local
