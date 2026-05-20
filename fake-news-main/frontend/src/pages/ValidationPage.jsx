@@ -9,12 +9,12 @@ const TYPES = [
 ];
 
 export default function ValidationPage() {
-  const [type, setType]           = useState("text");
-  const [text, setText]           = useState("");
-  const [url, setUrl]             = useState("");
-  const [file, setFile]           = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
+  const [type, setType]             = useState("text");
+  const [text, setText]             = useState("");
+  const [url, setUrl]               = useState("");
+  const [file, setFile]             = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
   const [dragActive, setDragActive] = useState(false);
   const navigate = useNavigate();
 
@@ -22,29 +22,22 @@ export default function ValidationPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    try {
-      // Build data object with correct field names
-      const submissionData = {
-        text: null,
-        url: null,
-        audio: null,
-        video: null,
-      };
 
-      if (type === "text" && text) {
-        submissionData.text = text;
-      } else if (type === "url" && url) {
-        submissionData.url = url;
+    try {
+      // FIX: pass a plain object — api.js submitValidation builds FormData internally.
+      // Never pass a pre-built FormData; Axios can't read .text/.url from it.
+      let payload = {};
+
+      if (type === "text" && text.trim()) {
+        payload = { text: text.trim() };
+      } else if (type === "url" && url.trim()) {
+        payload = { url: url.trim() };
       } else if (type === "media" && file) {
-        // Determine if file is audio or video based on MIME type
+        // Route file to correct serializer field based on MIME type
         if (file.type.startsWith("audio/")) {
-          submissionData.audio = file;
-        } else if (file.type.startsWith("video/")) {
-          submissionData.video = file;
+          payload = { audio: file };
         } else {
-          setError("Please upload a valid audio or video file.");
-          setLoading(false);
-          return;
+          payload = { video: file };
         }
       } else {
         setError("Please provide content to verify.");
@@ -52,8 +45,9 @@ export default function ValidationPage() {
         return;
       }
 
-      const res = await submitValidation(submissionData);
-      navigate(`/result/${res.submission_id}`);
+      const res = await submitValidation(payload);
+      // Backend returns both submission_id and id — use whichever is present
+      navigate(`/result/${res.submission_id || res.id}`);
     } catch (err) {
       setError(err.message || "Submission failed. Please try again.");
     } finally {
@@ -202,15 +196,13 @@ export default function ValidationPage() {
                 <textarea
                   className="form-textarea"
                   value={text}
-                  onChange={e => setText(e.target.value)}
+                  onChange={(e) => setText(e.target.value)}
                   placeholder="Paste the full article text here. More content yields more accurate results..."
                   required
                   disabled={loading}
                   rows={9}
                 />
-                <div
-                  style={{ marginTop: 6, fontSize: "0.75rem", color: "var(--text-muted)" }}
-                >
+                <div style={{ marginTop: 6, fontSize: "0.75rem", color: "var(--text-muted)" }}>
                   Minimum 50 characters recommended · {text.length} characters entered
                 </div>
               </div>
@@ -224,7 +216,7 @@ export default function ValidationPage() {
                   type="url"
                   className="form-input"
                   value={url}
-                  onChange={e => setUrl(e.target.value)}
+                  onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://example.com/article"
                   required
                   disabled={loading}
@@ -257,12 +249,10 @@ export default function ValidationPage() {
                   <input
                     type="file"
                     id="media-upload"
-                    accept="audio/*,video/*"
-                    className="hidden"
-                    onChange={e => setFile(e.target.files?.[0])}
-                    required
-                    disabled={loading}
+                    accept="audio/*,video/*,.mp3,.mp4,.wav,.ogg,.webm,.m4a,.aac"
                     style={{ display: "none" }}
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    disabled={loading}
                   />
                   <label htmlFor="media-upload" style={{ cursor: "pointer", display: "block" }}>
                     <div
@@ -275,7 +265,7 @@ export default function ValidationPage() {
                       Drop file here or click to browse
                     </div>
                     <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      MP3, MP4, WAV · Max 100 MB · Audio transcribed automatically
+                      MP3, MP4, WAV, OGG, M4A · Max 100 MB · Audio transcribed automatically
                     </div>
                     {file && (
                       <div
@@ -286,6 +276,9 @@ export default function ValidationPage() {
                       </div>
                     )}
                   </label>
+                </div>
+                <div style={{ marginTop: 8, fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                  💡 If files don't appear in the picker, browse to the folder containing your audio or video files
                 </div>
               </div>
             )}
@@ -307,7 +300,6 @@ export default function ValidationPage() {
               )}
             </button>
 
-            {/* Security note */}
             <div
               style={{
                 marginTop: 16,
