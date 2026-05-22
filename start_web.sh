@@ -7,6 +7,21 @@ cd /app/fake-news-main/backend
 echo "==> Running migrations..."
 python manage.py migrate --run-syncdb
 
+echo "==> Creating admin user if not exists..."
+python manage.py shell -c "
+from django.contrib.auth import get_user_model
+import os
+User = get_user_model()
+username = os.getenv('ADMIN_USERNAME', '')
+email = os.getenv('ADMIN_EMAIL', '')
+password = os.getenv('ADMIN_PASSWORD', '')
+if username and password and not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username, email, password)
+    print('Admin user created: ' + username)
+else:
+    print('Admin user already exists or env vars not set')
+"
+
 echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
 
