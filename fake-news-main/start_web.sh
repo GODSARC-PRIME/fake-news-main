@@ -1,14 +1,10 @@
 #!/bin/bash
-set -e  # Exit immediately if any command fails
 
-# Use absolute path — Railway extracts the repo to /app/
 cd /app/fake-news-main/backend
 
-echo "==> Running migrations..."
 python manage.py migrate --run-syncdb
 
-echo "==> Creating admin user if not exists..."
-python manage.py shell -c "
+python manage.py shell << 'EOF'
 from django.contrib.auth import get_user_model
 import os
 User = get_user_model()
@@ -25,12 +21,10 @@ if username and password:
     print('Admin user ready: ' + username)
 else:
     print('ADMIN env vars not set - skipping')
-"
+EOF
 
-echo "==> Collecting static files..."
 python manage.py collectstatic --noinput
 
-echo "==> Starting Gunicorn..."
 exec gunicorn checkdem_backend.wsgi:application \
   --bind 0.0.0.0:8000 \
   --workers 2 \
