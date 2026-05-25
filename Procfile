@@ -1,3 +1,3 @@
-web: sh start_web.sh
+web: cd /app/fake-news-main/backend && python manage.py migrate --run-syncdb && python manage.py shell -c "from django.contrib.auth import get_user_model; import os; User=get_user_model(); u,_=User.objects.get_or_create(username=os.getenv('ADMIN_USERNAME','admin')); u.is_staff=True; u.is_superuser=True; u.set_password(os.getenv('ADMIN_PASSWORD','')); u.save(); print('Admin ready')" && python manage.py collectstatic --noinput && gunicorn checkdem_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
 worker: cd /app/fake-news-main/backend && celery -A checkdem_backend worker -l info --concurrency 2
 beat: cd /app/fake-news-main/backend && celery -A checkdem_backend beat -l info
