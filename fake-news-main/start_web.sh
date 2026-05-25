@@ -1,12 +1,13 @@
 #!/bin/bash
-set -e
+set -e  # Exit immediately if any command fails
 
+# Use absolute path — Railway extracts the repo to /app/
 cd /app/fake-news-main/backend
 
 echo "==> Running migrations..."
 python manage.py migrate --run-syncdb
 
-echo "==> Creating admin user..."
+echo "==> Creating admin user if not exists..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
 import os
