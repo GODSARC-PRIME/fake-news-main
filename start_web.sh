@@ -15,11 +15,16 @@ User = get_user_model()
 username = os.getenv('ADMIN_USERNAME', '')
 email = os.getenv('ADMIN_EMAIL', '')
 password = os.getenv('ADMIN_PASSWORD', '')
-if username and password and not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username, email, password)
-    print('Admin user created: ' + username)
+if username and password:
+    user, created = User.objects.get_or_create(username=username)
+    user.email = email
+    user.is_staff = True
+    user.is_superuser = True
+    user.set_password(password)
+    user.save()
+    print('Admin user ready: ' + username)
 else:
-    print('Admin user already exists or env vars not set')
+    print('ADMIN env vars not set - skipping')
 "
 
 echo "==> Collecting static files..."
