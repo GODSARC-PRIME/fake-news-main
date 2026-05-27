@@ -7,13 +7,23 @@ const api = axios.create({
 });
 
 // Attach auth token to every request that has one
-api.interceptors.request.use((config) => {
-  const token = getAuthToken();
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
+//api.interceptors.request.use((config) => {
+  //const token = getAuthToken();
+  //if (token) {
+    //config.headers.Authorization = `Token ${token}`;
+  //}
+  //return config;
+//});
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("authUser");
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+); 
 
 // Helper — backend returns { error: "..." }, not { detail: "..." }
 // This handles both shapes plus any plain message key
