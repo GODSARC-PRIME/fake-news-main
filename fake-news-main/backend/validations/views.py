@@ -85,9 +85,9 @@ def _normalise_result(submission):
 
         # Top-level classification fields the frontend reads directly
         "classification": result_blob.get("classification", ""),
-        "confidence":     result_blob.get("confidence_score", 0),   # renamed key
+        "confidence": result_blob.get("confidence_score") or result_blob.get("confidence", 0),
         "explanation":    result_blob.get("explanation", ""),
-        "suspicious_elements": submission.suspicious_words or [],    # renamed key
+        "suspicious_elements": submission.suspicious_words or [],   
         "sources": sources,
 
         # Additional detail for any consumers that want the full picture
