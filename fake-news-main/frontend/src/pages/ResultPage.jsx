@@ -324,8 +324,10 @@ export default function ResultPage() {
                           textDecoration: "none",
                           fontFamily: "var(--font-mono)",
                           display: "flex",
-                          alignItems: "center",
+                          alignItems: "flex-start",
                           gap: 6,
+                          wordBreak: "break-all",      
+                          overflowWrap: "break-word",
                         }}
                         onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
                         onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
