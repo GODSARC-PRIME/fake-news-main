@@ -96,18 +96,8 @@ def process_validation_submission(self, submission_id: str):
                 wav_path = os.path.join(tmpdir, "input.wav")
 
                 ffmpeg_cmd = [
-                    _ffmpeg_binary(),
-                    "-y",
-                    "-i",
-                    in_path,
-                    "-vn",
-                    "-ac",
-                    "1",
-                    "-ar",
-                    "16000",
-                    "-f",
-                    "wav",
-                    wav_path,
+                    _ffmpeg_binary(), "-y", "-i", in_path,
+                    "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", wav_path,
                 ]
 
                 try:
@@ -126,7 +116,6 @@ def process_validation_submission(self, submission_id: str):
                         device=whisper_device,
                         compute_type=whisper_compute_type,
                     )
-
                     transcribe_language = (submission.language or "").strip() or None
                     segments, _info = model.transcribe(wav_path, language=transcribe_language)
                     transcript = "".join((seg.text or "") for seg in segments).strip()
@@ -163,126 +152,287 @@ def process_validation_submission(self, submission_id: str):
                 except Exception:
                     pass
 
+        # ─────────────────────────────────────────────────────────────
+        # HEURISTIC VALIDATOR — improved with broader pattern detection
+        # Used as fallback when Mistral AI key is not configured
+        # ─────────────────────────────────────────────────────────────
         def heuristic_validate(text_raw: str, url_value: str):
             text = (text_raw or "").lower()
-            url = (url_value or "").lower()
+            url  = (url_value or "").lower()
 
-            clickbait_phrases = [
-                "breaking",
-                "shocking",
+            # High-weight misinformation signals (score +3 each)
+            high_signals = [
+                "breaking news",
                 "you won't believe",
-                "miracle",
-                "secret",
+                "they don't want you to know",
+                "the truth about",
+                "what the media won't tell you",
+                "mainstream media hiding",
+                "fake news exposed",
+                "scientists are baffled",
+                "doctors hate this",
+                "one weird trick",
+                "big pharma",
+                "new world order",
+                "deep state",
+                "george soros",
+                "illuminati",
+                "false flag",
+                "crisis actor",
+                "plandemic",
+                "microchip vaccine",
+                "5g causes",
+                "chemtrails",
+                "flat earth",
+                "moon landing fake",
+                "election stolen",
+                "voter fraud confirmed",
+                "martial law",
+                "mandatory quarantine camps",
+                "government coverup",
+                "suppressed cure",
+                "cancer cure hidden",
+                "miracle cure",
+                "instant weight loss",
+                "make money fast",
+                "click here now",
+                "limited time offer",
+                "act now before",
+                "this will shock you",
+                "share before deleted",
+                "banned from the internet",
+                "deleted by facebook",
+                "censored by google",
+            ]
+
+            # Medium-weight clickbait signals (score +2 each)
+            medium_signals = [
+                "shocking",
+                "unbelievable",
+                "incredible",
+                "bombshell",
+                "explosive",
+                "devastating",
+                "outrageous",
+                "scandalous",
+                "horrifying",
+                "terrifying",
+                "alarming",
                 "urgent",
                 "must see",
                 "share this",
-                "they don't want you to know",
-                "what happens next",
                 "exposed",
                 "banned",
-                "cure",
                 "hoax",
                 "conspiracy",
                 "100%",
                 "guaranteed",
-            ]
-            suspicious_domains = [
-                "blogspot.",
-                "wordpress.",
-                "bit.ly",
-                "tinyurl.",
-                "t.co",
+                "natural remedy",
+                "home remedy",
+                "they lied",
+                "wake up",
+                "sheeple",
+                "brainwashed",
+                "mind control",
+                "propaganda",
+                "satanic",
+                "pedophile ring",
+                "child trafficking",
+                "arrested for treason",
+                "executed secretly",
+                "clone",
+                "hologram",
+                "simulation",
+                "reptilian",
+                "alien invasion",
+                "end times",
+                "apocalypse",
+                "rapture",
+                "biblical prophecy",
             ]
 
-            hits = []
+            # Low-weight signals (score +1 each)
+            low_signals = [
+                "breaking",
+                "secret",
+                "miracle",
+                "cure",
+                "forbidden",
+                "they don't want",
+                "watch before",
+                "before it's too late",
+                "only a few know",
+                "hidden truth",
+                "alternative facts",
+                "do your research",
+                "do your own research",
+                "question everything",
+                "mainstream narrative",
+            ]
+
+            suspicious_domains = [
+                "blogspot.", "wordpress.", "bit.ly", "tinyurl.", "t.co",
+                "infowars.", "naturalnews.", "beforeitsnews.", "worldtruth.",
+                "yournewswire.", "newspunch.", "themindunleashed.",
+                "activistpost.", "zerohedge.", "globalresearch.",
+            ]
+
+            hits  = []
             score = 0
 
-            for phrase in clickbait_phrases:
+            for phrase in high_signals:
+                if phrase in text:
+                    hits.append(phrase)
+                    score += 3
+
+            for phrase in medium_signals:
                 if phrase in text:
                     hits.append(phrase)
                     score += 2
 
+            for phrase in low_signals:
+                if phrase in text:
+                    hits.append(phrase)
+                    score += 1
+
+            # Punctuation abuse
             if "!!!" in (text_raw or ""):
-                hits.append("!!!")
+                hits.append("triple_exclamation")
                 score += 2
-            if (text_raw or "").count("!") >= 3:
+            if (text_raw or "").count("!") >= 4:
                 hits.append("many_exclamation_marks")
+                score += 2
+            elif (text_raw or "").count("!") >= 2:
+                hits.append("multiple_exclamation_marks")
                 score += 1
-            if (text_raw or "").count("?") >= 3:
+            if (text_raw or "").count("?") >= 4:
                 hits.append("many_question_marks")
                 score += 1
 
+            # Excessive ALL CAPS
             letters = re.findall(r"[A-Za-z]", text_raw or "")
             if letters:
-                upper = sum(1 for c in letters if c.isupper())
+                upper       = sum(1 for c in letters if c.isupper())
                 upper_ratio = upper / len(letters)
                 if upper_ratio >= 0.45 and len(letters) >= 20:
                     hits.append("excessive_caps")
-                    score += 2
+                    score += 3
+                elif upper_ratio >= 0.30 and len(letters) >= 30:
+                    hits.append("high_caps_ratio")
+                    score += 1
 
+            # Unsubstantiated superlatives
+            superlatives = re.findall(
+                r"\b(worst|best|greatest|most|least|never before|first ever|only one|"
+                r"unprecedented|historic|revolutionary|game.changing)\b",
+                text,
+            )
+            if len(superlatives) >= 3:
+                hits.append("excessive_superlatives")
+                score += 2
+
+            # Vague attribution — red flag for fabricated quotes
+            vague_sources = re.findall(
+                r"\b(sources say|insiders reveal|anonymous source|"
+                r"experts say|scientists confirm|doctors confirm|"
+                r"studies show|research proves|reports suggest)\b",
+                text,
+            )
+            if len(vague_sources) >= 2:
+                hits.append("vague_attribution")
+                score += 2
+
+            # Very short unsubstantiated claim
             word_count = len(re.findall(r"\b\w+\b", text_raw or ""))
-            if 0 < word_count <= 6:
+            if 0 < word_count <= 8:
                 hits.append("very_short_claim")
-                score += 1
+                score += 2
 
+            # Suspicious domains
             for dom in suspicious_domains:
                 if dom in url:
                     hits.append(dom)
-                    score += 2
+                    score += 3
 
+            # ── Classification ─────────────────────────────────────
             threshold = 4
             classification = "fake" if score >= threshold else "real"
 
-            # Confidence should increase as we move away from the decision boundary.
-            # Keep it in a conservative band (55-95) to avoid overclaiming certainty.
             if classification == "fake":
-                confidence = 70 + (score - threshold) * 7
+                raw_conf = 55 + min(40, (score - threshold) * 4)
             else:
-                confidence = 70 + (threshold - 1 - score) * 7
-            confidence = int(max(55, min(95, confidence)))
+                raw_conf = 55 + min(35, (threshold - score) * 5)
+            confidence = int(max(40, min(95, raw_conf)))
 
-            explanation = (
-                "This content contains multiple clickbait/emphasis patterns often seen in misinformation. Consider verifying with reputable sources."
-                if classification == "fake"
-                else "This content does not strongly match common clickbait or misinformation patterns. For higher certainty, cross-check against reputable sources."
-            )
+            if classification == "fake":
+                found = ", ".join(f'"{h}"' for h in hits[:5])
+                explanation = (
+                    f"This content shows {score} misinformation signals "
+                    f"(threshold: {threshold}). Key patterns detected: {found}. "
+                    f"Consider verifying with reputable sources before sharing."
+                )
+            else:
+                explanation = (
+                    "This content does not strongly match known misinformation patterns. "
+                    "The heuristic analysis found no significant red flags. "
+                    "For higher certainty, cross-check against reputable sources."
+                )
 
             return classification, confidence, explanation, hits
 
+        # ─────────────────────────────────────────────────────────────
+        # MISTRAL AI VALIDATOR
+        # Checks both CHECKDEM_MISTRAL_API_KEY and MISTRAL_API_KEY
+        # so either Railway variable name works
+        # ─────────────────────────────────────────────────────────────
         def mistral_validate(text_raw: str, url_value: str):
-            api_key = os.getenv("CHECKDEM_MISTRAL_API_KEY", "").strip()
+            # Support both naming conventions
+            api_key = (
+                os.getenv("CHECKDEM_MISTRAL_API_KEY", "").strip()
+                or os.getenv("MISTRAL_API_KEY", "").strip()
+            )
             if not api_key:
                 return None
 
-            base_url = os.getenv("CHECKDEM_MISTRAL_API_BASE_URL", "https://api.mistral.ai/v1").rstrip("/")
-            model = os.getenv("CHECKDEM_MISTRAL_MODEL", "mistral-small-latest")
+            base_url = os.getenv(
+                "CHECKDEM_MISTRAL_API_BASE_URL", "https://api.mistral.ai/v1"
+            ).rstrip("/")
+            model   = os.getenv("CHECKDEM_MISTRAL_MODEL", "mistral-small-latest")
             timeout = int(os.getenv("CHECKDEM_MISTRAL_TIMEOUT_SECONDS", "30"))
 
             user_payload = {
-                "text": (text_raw or "")[:4000],
-                "url": (url_value or "")[:2000],
+                "text":     (text_raw or "")[:4000],
+                "url":      (url_value or "")[:2000],
                 "language": submission.language or "",
             }
 
             system = (
-                "You are CheckDem, a fact-checking classifier. "
-                "Classify the content as 'fake' or 'real' and return strict JSON with keys: "
-                "classification ('fake'|'real'), confidence_score (0-100 integer), explanation (string), sources (array of strings). "
-                "Return ONLY valid JSON."
+                "You are CheckDem, an expert fact-checking classifier trained to detect "
+                "misinformation, fake news, and AI-generated fabricated content. "
+                "Analyse the provided text or URL content carefully. "
+                "Look for: fabricated statistics, impossible claims, lack of credible sources, "
+                "emotional manipulation, AI-generated patterns, logical inconsistencies, "
+                "and known misinformation narratives. "
+                "Return ONLY valid JSON with exactly these keys: "
+                "classification (string: 'fake' or 'real'), "
+                "confidence_score (integer 0-100, be precise — do not default to round numbers), "
+                "explanation (string: 2-3 sentences explaining your reasoning), "
+                "sources (array of strings: relevant fact-check URLs if known, else empty array). "
+                "Do NOT include any text outside the JSON object."
             )
 
             resp = requests.post(
                 f"{base_url}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
+                    "Content-Type":  "application/json",
                 },
                 json={
-                    "model": model,
-                    "temperature": 0.2,
+                    "model":       model,
+                    "temperature": 0.1,
                     "messages": [
                         {"role": "system", "content": system},
-                        {"role": "user", "content": json.dumps(user_payload)},
+                        {"role": "user",   "content": json.dumps(user_payload)},
                     ],
                 },
                 timeout=timeout,
@@ -293,7 +443,7 @@ def process_validation_submission(self, submission_id: str):
                 detail = (resp.text or "").strip()[:800]
                 raise ValueError(f"Mistral HTTP {resp.status_code}: {detail}") from exc
 
-            data = resp.json()
+            data    = resp.json()
             content = data["choices"][0]["message"]["content"]
 
             try:
@@ -311,20 +461,28 @@ def process_validation_submission(self, submission_id: str):
             confidence = int(parsed.get("confidence_score", 0))
             confidence = int(max(0, min(100, confidence)))
             explanation = str(parsed.get("explanation", "")).strip() or "No explanation provided."
-            sources = parsed.get("sources")
+            sources     = parsed.get("sources")
             if not isinstance(sources, list):
                 sources = []
 
             return {
-                "classification": classification,
+                "classification":  classification,
                 "confidence_score": confidence,
-                "explanation": explanation,
-                "sources": [{"type": "source", "value": s} for s in sources if isinstance(s, str) and s.strip()],
+                "explanation":     explanation,
+                "sources": [
+                    {"type": "source", "value": s}
+                    for s in sources
+                    if isinstance(s, str) and s.strip()
+                ],
                 "_validator": "mistral",
             }
 
-        ai_error = ""
-        mistral_key_present = bool(os.getenv("CHECKDEM_MISTRAL_API_KEY", "").strip())
+        # ── Run validators ────────────────────────────────────────────
+        ai_error          = ""
+        mistral_key_present = bool(
+            os.getenv("CHECKDEM_MISTRAL_API_KEY", "").strip()
+            or os.getenv("MISTRAL_API_KEY", "").strip()
+        )
 
         model_result = None
         try:
@@ -335,12 +493,14 @@ def process_validation_submission(self, submission_id: str):
 
         if model_result is not None:
             classification = model_result["classification"]
-            confidence = model_result["confidence_score"]
-            explanation = model_result["explanation"]
-            hits = []
-            validator_used = model_result.get("_validator") or "model"
+            confidence     = model_result["confidence_score"]
+            explanation    = model_result["explanation"]
+            hits           = []
+            validator_used = model_result.get("_validator") or "mistral"
         else:
-            classification, confidence, explanation, hits = heuristic_validate(original_text, url_raw)
+            classification, confidence, explanation, hits = heuristic_validate(
+                original_text, url_raw
+            )
             validator_used = "heuristic"
 
         sources = []
@@ -350,19 +510,18 @@ def process_validation_submission(self, submission_id: str):
             sources.append({"type": "url", "value": submission.input_url})
 
         submission.result = {
-            "classification": classification,
-            "confidence_score": confidence,
-            "explanation": explanation,
-            "sources": sources,
-            "validator": validator_used,
+            "classification":    classification,
+            "confidence_score":  confidence,
+            "explanation":       explanation,
+            "sources":           sources,
+            "validator":         validator_used,
             "mistral_key_present": mistral_key_present,
-            "ai_error": ai_error,
-            "transcript": (transcript_text[:4000] if transcript_text else ""),
-            "transcript_error": transcript_error,
-            "validator_input": ("transcript" if transcript_text else "text"),
+            "ai_error":          ai_error,
+            "transcript":        (transcript_text[:4000] if transcript_text else ""),
+            "transcript_error":  transcript_error,
+            "validator_input":   ("transcript" if transcript_text else "text"),
             "transcript_source": transcript_used,
         }
-        # Frontend expects suspicious_words as a list of strings
         submission.suspicious_words = hits
         submission.processing_status = ValidationSubmission.ProcessingStatus.COMPLETED
         submission.completed_at = timezone.now()
@@ -377,13 +536,21 @@ def process_validation_submission(self, submission_id: str):
                 "updated_at",
             ]
         )
+
     except Exception as exc:
         try:
             submission = ValidationSubmission.objects.get(id=submission_id)
             submission.processing_status = ValidationSubmission.ProcessingStatus.FAILED
-            submission.completed_at = timezone.now()
+            submission.completed_at  = timezone.now()
             submission.error_message = str(exc)
-            submission.save(update_fields=["processing_status", "completed_at", "error_message", "updated_at"])
+            submission.save(
+                update_fields=[
+                    "processing_status",
+                    "completed_at",
+                    "error_message",
+                    "updated_at",
+                ]
+            )
         except Exception:
             pass
         raise
