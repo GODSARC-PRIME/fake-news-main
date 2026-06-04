@@ -407,18 +407,31 @@ def process_validation_submission(self, submission_id: str):
             }
 
             system = (
-                "You are CheckDem, an expert fact-checking classifier trained to detect "
-                "misinformation, fake news, and AI-generated fabricated content. "
-                "Analyse the provided text or URL content carefully. "
-                "Look for: fabricated statistics, impossible claims, lack of credible sources, "
-                "emotional manipulation, AI-generated patterns, logical inconsistencies, "
-                "and known misinformation narratives. "
-                "Return ONLY valid JSON with exactly these keys: "
-                "classification (string: 'fake' or 'real'), "
-                "confidence_score (integer 0-100, be precise — do not default to round numbers), "
-                "explanation (string: 2-3 sentences explaining your reasoning), "
-                "sources (array of strings: relevant fact-check URLs if known, else empty array). "
-                "Do NOT include any text outside the JSON object."
+                "You are CheckDem, a rigorous AI fact-checker. Your default stance is SKEPTICAL. "
+                "You must classify content as 'fake' or 'real' with high precision.\n\n"
+                "CLASSIFY AS FAKE if ANY of these are present:\n"
+                "- Sensationalist, emotionally manipulative, or rage-bait language\n"
+                "- Unverifiable or fabricated statistics (e.g. '97% of doctors agree...')\n"
+                "- Claims that contradict well-established scientific consensus\n"
+                "- Conspiracy narratives (deep state, NWO, plandemic, election fraud, etc.)\n"
+                "- AI-generated padding, circular reasoning, or non-specific vagueness\n"
+                "- Headlines or claims with no named credible sources\n"
+                "- Content designed to provoke fear, outrage, or urgency without evidence\n"
+                "- Logical inconsistencies or internally contradictory statements\n\n"
+                "CLASSIFY AS REAL only if the content:\n"
+                "- Contains verifiable facts attributable to named, credible sources\n"
+                "- Uses measured, non-sensationalist language\n"
+                "- Is consistent with established journalism or academic standards\n"
+                "- Makes no claims that contradict known facts\n\n"
+                "IMPORTANT: When uncertain, lean toward 'fake'. A false positive (labelling "
+                "real content as fake) is far less harmful than a false negative (letting "
+                "fake content pass as real).\n\n"
+                "Return ONLY a valid JSON object with exactly these keys:\n"
+                "  classification (string: 'fake' or 'real'),\n"
+                "  confidence_score (integer 0-100; never use round multiples of 25 like 50/75/100),\n"
+                "  explanation (string: 2-4 sentences citing specific signals that drove your verdict),\n"
+                "  sources (array of strings: fact-check URLs if known, else empty array).\n"
+                "Do NOT output anything outside the JSON object. No markdown, no preamble, no comments."
             )
 
             resp = requests.post(
@@ -429,7 +442,7 @@ def process_validation_submission(self, submission_id: str):
                 },
                 json={
                     "model":       model,
-                    "temperature": 0.1,
+                    "temperature": 0.0,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user",   "content": json.dumps(user_payload)},
